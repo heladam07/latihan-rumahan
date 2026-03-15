@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 
@@ -11,7 +11,9 @@ import {
   Timer,
   Flame,
   Zap,
-  Clock
+  Clock,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { Gender, MuscleGroup, WORKOUT_PLANS, Exercise } from './types';
 
@@ -132,20 +134,29 @@ const WorkoutExecution = ({ group, duration, onComplete, onBack }: { group: Musc
   const [isFinished, setIsFinished] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const currentExercise = plan.exercises[currentExerciseIndex];
+  const currentExercise = plan?.exercises?.[currentExerciseIndex];
 
   const speak = (text: string) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'id-ID';
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    try {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'id-ID';
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (e) {
+      console.warn("Speech synthesis failed:", e);
+      setIsSpeaking(false);
+    }
   };
 
   useEffect(() => {
-    // Speak exercise name and description on start
-    speak(`Gerakan selanjutnya: ${currentExercise.name}. ${currentExercise.description}`);
+    if (currentExercise) {
+      speak(`Gerakan selanjutnya: ${currentExercise.name}. ${currentExercise.description}`);
+    }
   }, [currentExerciseIndex]);
 
   useEffect(() => {
@@ -161,7 +172,7 @@ const WorkoutExecution = ({ group, duration, onComplete, onBack }: { group: Musc
   }, [isActive, timeLeft]);
 
   const handleNext = () => {
-    if (currentExerciseIndex < plan.exercises.length - 1) {
+    if (plan?.exercises && currentExerciseIndex < plan.exercises.length - 1) {
       const nextIndex = currentExerciseIndex + 1;
       setCurrentExerciseIndex(nextIndex);
       setTimeLeft(duration);
@@ -172,6 +183,15 @@ const WorkoutExecution = ({ group, duration, onComplete, onBack }: { group: Musc
       speak('Latihan selesai. Kerja bagus!');
     }
   };
+
+  if (!plan || !currentExercise) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-stone-50">
+        <p className="text-stone-500 mb-4">Data latihan tidak ditemukan.</p>
+        <button onClick={onBack} className="text-emerald-600 font-bold underline">Kembali</button>
+      </div>
+    );
+  }
 
   if (isFinished) {
     return (
